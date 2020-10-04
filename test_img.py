@@ -1,15 +1,17 @@
-import torch
 import argparse
 import os
-from PIL import Image
-import tools
-import torchvision.transforms as transforms
-from model import VggEncoder
 import time
 
+import torch
+import torchvision.transforms as transforms
+from PIL import Image
+
+import tools
+from model import VggEncoder
+
 parser = argparse.ArgumentParser()
-parser.add_argument('--image_path', type=str, default=None, help='path to load images. It should include image name with: front|left|right')
-parser.add_argument('--save_dir', type=str, default='./result', help='path to save 3D face shapes')
+parser.add_argument('--image_path', type=str, default='/data0/2_Project/python/deeplearning_python/comparison/mvfnet/data/imgs_fs', help='path to load images. It should include image name with: front|left|right')
+parser.add_argument('--save_dir', type=str, default='/data0/2_Project/python/deeplearning_python/comparison/mvfnet/data/imgs_fs', help='path to save 3D face shapes')
 
 options = parser.parse_args()
 crop_opt = True # change to True if you want to crop the image
@@ -33,4 +35,4 @@ start = time.time()
 preds = model(input_tensor)
 print(time.time() -start)
 faces3d = tools.preds_to_shape(preds[0].detach().cpu().numpy())
-tools.write_ply(os.path.join(options.save_dir, 'shape.ply'), faces3d[0], faces3d[1])
+tools.write_ply(os.path.join(options.save_dir, 'shape.ply'), faces3d[0]/1000, faces3d[1])

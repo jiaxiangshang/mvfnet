@@ -1,3 +1,5 @@
+import sys, os
+
 import face_alignment
 import numpy as np
 import scipy.io as io
@@ -7,10 +9,14 @@ import pandas as pd
 import sys
 import math
 
-model_shape = io.loadmat('data/Model_Shape.mat')
+#model_try = io.loadmat('data/01_MorphableModel.mat')
+_curr_path = os.path.abspath(__file__) # /home/..../face
+_cur_dir = os.path.dirname(_curr_path) # ./
+
+model_shape = io.loadmat(os.path.join(_cur_dir, 'data/Model_Shape.mat'))
 kpt_index = np.reshape(model_shape['keypoints'], 68).astype(np.int32) - 1
-model_exp = io.loadmat('data/Model_Expression.mat')
-data = io.loadmat('data/sigma_exp.mat')
+model_exp = io.loadmat(os.path.join(_cur_dir, 'data/Model_Expression.mat'))
+data = io.loadmat(os.path.join(_cur_dir, 'data/sigma_exp.mat'))
 pose_mean = np.array([0,0,0,112,112,0,0]).astype(np.float32)
 pose_std = np.array([math.pi/2.0,math.pi/2.0,math.pi/2.0,56,56,1,224.0 / (2 * 180000.0)]).astype(np.float32)
 
@@ -54,25 +60,39 @@ def preds_to_shape(preds):
     face_shape = face_shape.reshape(-1, 3)
     
     R, t, s = preds_to_pose(preds[228:228+7])
-    kptA = np.matmul(face_shape[kpt_index], s*R[:2].transpose()) + np.repeat(np.reshape(t,[1,2]), 68, axis=0) 
+    kptA = np.matmul(face_shape[kpt_index], s*R[:2].transpose()) + np.repeat(np.reshape(t,[1,2]), 68, axis=0)
     kptA[:, 1] = 224 - kptA[:, 1]
+    face_shapeA = np.matmul(face_shape, s*R.transpose())
+    face_shapeA = face_shapeA + np.repeat(np.concatenate([np.reshape(t,[1,2]), np.zeros([1,1])], axis=1), face_shape.shape[0], axis=0)
+    face_shapeA[:, 1] = 224 - face_shapeA[:, 1]
+
     R, t, s = preds_to_pose(preds[228+7:228+14])
     kptB = np.matmul(face_shape[kpt_index], s*R[:2].transpose()) + np.repeat(np.reshape(t,[1,2]), 68, axis=0)
     kptB[:, 1] = 224 - kptB[:, 1]
+    face_shapeB = np.matmul(face_shape, s*R.transpose())
+    face_shapeB = face_shapeB + np.repeat(np.concatenate([np.reshape(t,[1,2]), np.zeros([1,1])], axis=1), face_shape.shape[0], axis=0)
+    face_shapeB[:, 1] = 224 - face_shapeB[:, 1]
     
     R, t, s = preds_to_pose(preds[228+14:])
     kptC = np.matmul(face_shape[kpt_index], s*R[:2].transpose()) + np.repeat(np.reshape(t,[1,2]), 68, axis=0)
     kptC[:, 1] = 224 - kptC[:, 1]
-    return [face_shape, model_shape['tri'].astype(np.int64).transpose() - 1, kptA, kptB, kptC]
+    face_shapeC = np.matmul(face_shape, s*R.transpose())
+    face_shapeC = face_shapeC + np.repeat(np.concatenate([np.reshape(t,[1,2]), np.zeros([1,1])], axis=1), face_shape.shape[0], axis=0)
+    face_shapeC[:, 1] = 224 - face_shapeC[:, 1]
+
+    return [face_shape, model_shape['tri'].astype(np.int64).transpose() - 1, kptA, kptB, kptC, face_shape[kpt_index], face_shapeA, face_shapeB, face_shapeC]
     
     
-def crop_image(image, res=224):
-    fa = face_alignment.FaceAlignment(face_alignment.LandmarksType._3D, flip_input=False)
-    pts = fa.get_landmarks(np.array(image))
-    if len(pts) < 1:
-        assert "No face detected!"
-    pts = np.array(pts[0]).astype(np.int32)
-        
+def crop_image(image, res=224, pts_gt=None):
+    if pts_gt is None:
+        fa = face_alignment.FaceAlignment(face_alignment.LandmarksType._3D, flip_input=False)
+        pts = fa.get_landmarks(np.array(image))
+        if len(pts) < 1:
+            assert "No face detected!"
+        pts = np.array(pts[0]).astype(np.int32)
+    else:
+        pts = pts_gt
+
     h = image.size[1]
     w = image.size[0]
         # x-width-pts[0,:], y-height-pts[1,:]
